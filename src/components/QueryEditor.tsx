@@ -48,7 +48,7 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
         showLineNumbers={true}
         language="sql"
         onBlur={onQueryTextChange}
-        value={queryText || 'SELECT * FROM `table` LIMIT 1'}
+        value={queryText}
       />
     </div>
   );

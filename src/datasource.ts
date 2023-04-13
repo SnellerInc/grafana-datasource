@@ -5,7 +5,7 @@ import {
   DataSourceInstanceSettings,
 } from '@grafana/data';
 
-import { getBackendSrv, isFetchError } from '@grafana/runtime';
+import { getBackendSrv, getTemplateSrv, isFetchError } from '@grafana/runtime';
 import { MyQuery, MyDataSourceOptions, DEFAULT_QUERY, SnellerDatabase } from './types';
 
 import _ from 'lodash';
@@ -28,7 +28,8 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
       const query = defaults(target, DEFAULT_QUERY);
 
       try {
-        const response = await this.executeQuery('/executeQuery', query.queryText, query.database);
+        const sql = getTemplateSrv().replace(query.queryText, options.scopedVars)
+        const response = await this.executeQuery('/executeQuery', sql, query.database);
       
         /**
          * The endpoint returns:
