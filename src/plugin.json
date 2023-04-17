@@ -4,10 +4,13 @@
   "name": "Sneller",
   "id": "snellerinc-sneller-datasource",
   "metrics": true,
+  "backend": true,
+  "alerting": true,
+  "executable": "gpx_sneller",
   "info": {
     "description": "",
     "author": {
-      "name": "SnellerInc"
+      "name": "Sneller inc"
     },
     "keywords": ["datasource"],
     "logos": {
@@ -19,18 +22,6 @@
     "version": "%VERSION%",
     "updated": "%TODAY%"
   },
-  "routes": [
-    {
-      "path": "snellerd",
-      "url": "{{ .JsonData.endpoint }}",
-      "headers": [
-        {
-          "name": "Authorization",
-          "content": "Bearer {{ .SecureJsonData.token }}"
-        }
-      ]
-    }
-  ],  
   "dependencies": {
     "grafanaDependency": "^9.3.8",
     "plugins": []

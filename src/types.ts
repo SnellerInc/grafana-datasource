@@ -1,18 +1,18 @@
 import { DataQuery, DataSourceJsonData } from '@grafana/data';
 
-export interface MyQuery extends DataQuery {
+export interface SnellerQuery extends DataQuery {
   database?: string;
-  queryText: string;
+  sql?: string;
 }
 
-export const DEFAULT_QUERY: Partial<MyQuery> = {
-  queryText: 'SELECT 1+2',
+export const DEFAULT_QUERY: Partial<SnellerQuery> = {
+  sql: 'SELECT 1+2',
 };
 
 /**
  * These are options configured for each DataSource instance
  */
-export interface MyDataSourceOptions extends DataSourceJsonData {
+export interface SnellerDataSourceOptions extends DataSourceJsonData {
   region?: string;
   endpoint?: string;
 }
@@ -20,10 +20,6 @@ export interface MyDataSourceOptions extends DataSourceJsonData {
 /**
  * Value that is used in the backend, but never sent over HTTP to the frontend
  */
-export interface MySecureJsonData {
+export interface SnellerSecureJsonData {
   token?: string;
-}
-
-export interface SnellerDatabase {
-  name: string;
 }
