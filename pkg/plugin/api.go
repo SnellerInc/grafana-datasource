@@ -31,13 +31,15 @@ func (d *Datasource) getDatabases(ctx context.Context) ([]string, int, error) {
 		return nil, 500, err
 	}
 
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, 500, err
-	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.DefaultLogger.Error("failed to close response body", "err", err)
+		}
+	}()
 
 	var result []snellerDatabase
-	err = json.Unmarshal(b, &result)
+
+	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
 		return nil, 500, err
 	}
@@ -61,13 +63,15 @@ func (d *Datasource) getTables(ctx context.Context, database string) ([]string, 
 		return nil, 500, err
 	}
 
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, 500, err
-	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.DefaultLogger.Error("failed to close response body", "err", err)
+		}
+	}()
 
 	var result []string
-	err = json.Unmarshal(b, &result)
+
+	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
 		return nil, 500, err
 	}

@@ -201,15 +201,22 @@ func (d *Datasource) handleCallResourceTables(ctx context.Context, database stri
 }
 
 func (d *Datasource) handleQuery(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-	var wg sync.WaitGroup
 	response := backend.NewQueryDataResponse()
 
+	var wg sync.WaitGroup
 	wg.Add(len(req.Queries))
+
+	var mutex sync.Mutex
 
 	// Execute each query and store the results by query RefID
 	for _, q := range req.Queries {
 		go func(query backend.DataQuery) {
-			response.Responses[query.RefID] = d.query(ctx, req.PluginContext, query)
+			resp := d.query(ctx, req.PluginContext, query)
+
+			mutex.Lock()
+			defer mutex.Unlock()
+			response.Responses[query.RefID] = resp
+
 			wg.Done()
 		}(q)
 	}

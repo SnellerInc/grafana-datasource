@@ -3,8 +3,10 @@ package plugin
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/amazon-ion/ion-go/ion"
@@ -27,6 +29,13 @@ func frameFromSnellerResult(refID, sql string, input io.Reader, timeField string
 		return nil, err
 	}
 
+	if schema.FinalStatus == nil {
+		return nil, errors.New("query execution failed: 'missing ::final_status annotation'")
+	}
+	if schema.FinalStatus.Error != "" {
+		return nil, fmt.Errorf("query execution failed: '%s'", schema.FinalStatus.Error)
+	}
+
 	// Step 2: Read values
 
 	fieldVals := make([]*fieldValues, len(schema.Columns))
@@ -44,7 +53,7 @@ func frameFromSnellerResult(refID, sql string, input io.Reader, timeField string
 		i++
 	}
 
-	err = iterateRows(bytes.NewReader(b), func(reader ion.Reader, index int) error {
+	_, err = iterateRows(bytes.NewReader(b), func(reader ion.Reader, index int) error {
 		return readRowValues(reader, index, fieldVals)
 	})
 
@@ -60,6 +69,20 @@ func frameFromSnellerResult(refID, sql string, input io.Reader, timeField string
 		Type:                   data.FrameTypeTable,
 		PreferredVisualization: data.VisTypeTable,
 		ExecutedQueryString:    sql,
+		Stats: []data.QueryStat{
+			{
+				FieldConfig: data.FieldConfig{DisplayName: "Hits"},
+				Value:       float64(schema.FinalStatus.Hits),
+			},
+			{
+				FieldConfig: data.FieldConfig{DisplayName: "Misses"},
+				Value:       float64(schema.FinalStatus.Misses),
+			},
+			{
+				FieldConfig: data.FieldConfig{DisplayName: "Scanned", Unit: "bytes"},
+				Value:       float64(schema.FinalStatus.Scanned),
+			},
+		},
 	}
 
 	return frame, nil
@@ -314,10 +337,18 @@ type snellerColumn struct {
 	Count    int               // The number of rows containing a value for this column
 }
 
+type snellerFinalStatus struct {
+	Hits    int64
+	Misses  int64
+	Scanned int64
+	Error   string
+}
+
 // snellerSchema represents the derived schema of a Sneller query result-set.
 type snellerSchema struct {
-	RowCount int                       // The total number of rows returned by the query
-	Columns  map[string]*snellerColumn // The individual columns indexed by their field names
+	RowCount    int                       // The total number of rows returned by the query
+	Columns     map[string]*snellerColumn // The individual columns indexed by their field names
+	FinalStatus *snellerFinalStatus       // The final query status
 }
 
 func deriveSchema(input io.Reader) (*snellerSchema, error) {
@@ -326,13 +357,15 @@ func deriveSchema(input io.Reader) (*snellerSchema, error) {
 		Columns:  map[string]*snellerColumn{},
 	}
 
-	err := iterateRows(input, func(reader ion.Reader, index int) error {
+	status, err := iterateRows(input, func(reader ion.Reader, index int) error {
 		schema.RowCount += 1
 		return analyzeRow(reader, &schema)
 	})
 	if err != nil {
 		return nil, err
 	}
+
+	schema.FinalStatus = status
 
 	// Detect missing values
 	for _, col := range schema.Columns {
@@ -405,44 +438,112 @@ func analyzeRow(reader ion.Reader, schema *snellerSchema) error {
 	return reader.Err()
 }
 
-func iterateRows(input io.Reader, fn func(reader ion.Reader, index int) error) error {
+func iterateRows(input io.Reader, readRowFn func(reader ion.Reader, index int) error) (*snellerFinalStatus, error) {
+	var status *snellerFinalStatus
 	reader := ion.NewReader(input)
 
 	index := 0
 	for reader.Next() {
 		if reader.Type() != ion.StructType {
-			return fmt.Errorf("expected 'struct' type, got '%s'", reader.Type().String())
+			return nil, fmt.Errorf("expected 'struct' type, got '%s'", reader.Type().String())
 		}
 
-		// Ignore the struct that follows the '::final_status' annotation
 		annotations, err := reader.Annotations()
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if len(annotations) != 0 && annotations[0].Text != nil && *annotations[0].Text == "final_status" {
-			continue
+
+		// Fail on unexpected annotations
+		if len(annotations) != 0 && (len(annotations) != 1 || annotations[0].Text == nil || *annotations[0].Text != "final_status") {
+			labels := make([]string, len(annotations))
+			for i := range annotations {
+				if annotations[0].Text != nil {
+					labels[i] = *annotations[i].Text
+				} else {
+					labels[i] = "%missing%"
+				}
+			}
+			return nil, fmt.Errorf("unexpected annotations: [%s]", strings.Join(labels, ", "))
+		}
+
+		err = reader.StepIn()
+		if err != nil {
+			return nil, err
+		}
+
+		// Parse ::final_status annotation
+		if len(annotations) != 0 {
+			status, err = readFinalStatus(reader)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		// Process data row
-		err = reader.StepIn()
+		err = readRowFn(reader, index)
 		if err != nil {
-			return err
-		}
-
-		err = fn(reader, index)
-		if err != nil {
-			return err
+			return nil, err
 		}
 
 		err = reader.StepOut()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		index++
 	}
 
-	return reader.Err()
+	return status, reader.Err()
+}
+
+func readFinalStatus(reader ion.Reader) (*snellerFinalStatus, error) {
+	var status = snellerFinalStatus{}
+
+	for reader.Next() {
+		sym, err := reader.FieldName()
+		if err != nil {
+			return nil, err
+		}
+		if sym == nil || sym.Text == nil {
+			continue
+		}
+
+		name := *sym.Text
+
+		switch name {
+		case "hits":
+			value, err := reader.Int64Value()
+			if err != nil {
+				return nil, err
+			}
+			status.Hits = *value
+		case "misses":
+			value, err := reader.Int64Value()
+			if err != nil {
+				return nil, err
+			}
+			status.Misses = *value
+		case "scanned":
+			value, err := reader.Int64Value()
+			if err != nil {
+				return nil, err
+			}
+			status.Scanned = *value
+		case "result_set":
+			// Ignore for now
+		case "error":
+			value, err := reader.StringValue()
+			if err != nil {
+				return nil, err
+			}
+			status.Error = *value
+		default:
+			return nil, fmt.Errorf("unexpected ::final_status field '%s'", name)
+		}
+
+	}
+
+	return &status, reader.Err()
 }
 
 type fieldReadFunc = func(reader ion.Reader, rowIndex int) error
