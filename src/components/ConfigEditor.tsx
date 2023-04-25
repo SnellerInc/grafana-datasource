@@ -1,16 +1,16 @@
 import React, { ChangeEvent } from 'react';
 import { InlineField, Input, SecretInput, Select, ActionMeta } from '@grafana/ui';
 import { DataSourcePluginOptionsEditorProps, SelectableValue } from '@grafana/data';
-import { MyDataSourceOptions, MySecureJsonData } from '../types';
+import { SnellerDataSourceOptions, SnellerSecureJsonData } from '../types';
 
-interface Props extends DataSourcePluginOptionsEditorProps<MyDataSourceOptions> {}
+interface Props extends DataSourcePluginOptionsEditorProps<SnellerDataSourceOptions> {}
 
 export function ConfigEditor(props: Props) {
   const { onOptionsChange, options } = props;
 
   interface SnellerRegion {
-      label: string;
-      value: string;
+    label: string;
+    value: string;
   }
 
   const snellerRegions: SnellerRegion[] = [
@@ -37,9 +37,9 @@ export function ConfigEditor(props: Props) {
   ];
 
   const onRegionChange = (value: SelectableValue<string>, actionMeta: ActionMeta) => {
-    let endpoint = (value.value === 'custom') 
-      ? options.jsonData.endpoint 
-      : `https://snellerd-master.${value.value}.sneller-dev.io`
+    let endpoint = (value.value === 'custom')
+        ? options.jsonData.endpoint
+        : `https://snellerd-master.${value.value}.sneller-dev.io`
 
     const jsonData = {
       ...options.jsonData,
@@ -82,35 +82,35 @@ export function ConfigEditor(props: Props) {
   };
 
   const { jsonData, secureJsonFields } = options;
-  const secureJsonData = (options.secureJsonData || {}) as MySecureJsonData;
+  const secureJsonData = (options.secureJsonData || {}) as SnellerSecureJsonData;
 
   return (
-    <div className="gf-form-group">
-      <InlineField label="Sneller Region" labelWidth={24} tooltip='' grow>
-        <Select 
-          options={snellerRegions} 
-          onChange={onRegionChange} 
-          value={jsonData.region} 
-        />
-      </InlineField>
-      <InlineField label="Sneller Endpoint" labelWidth={24} tooltip='' disabled={jsonData.region !== 'custom'} required grow>
-        <Input
-          onChange={onEndpointChange}
-          value={jsonData.endpoint}
-          placeholder="The Sneller query endpoint"
-          required
-        />
-      </InlineField>
-      <InlineField label="Sneller Token" labelWidth={24} tooltip='' required grow>
-        <SecretInput
-          isConfigured={(secureJsonFields && secureJsonFields.token) as boolean}
-          value={secureJsonData.token}
-          placeholder="The Sneller authentication token"
-          onReset={onResetToken}
-          onChange={onTokenChange}
-          required
-        />
-      </InlineField>
-    </div>
+      <div className="gf-form-group">
+        <InlineField label="Sneller Region" labelWidth={24} tooltip='' grow>
+          <Select
+              options={snellerRegions}
+              onChange={onRegionChange}
+              value={jsonData.region || 'us-east-1'}
+          />
+        </InlineField>
+        <InlineField label="Sneller Endpoint" labelWidth={24} tooltip='' disabled={jsonData.region !== 'custom'} required grow>
+          <Input
+              onChange={onEndpointChange}
+              value={jsonData.endpoint}
+              placeholder="The Sneller query endpoint"
+              required
+          />
+        </InlineField>
+        <InlineField label="Sneller Token" labelWidth={24} tooltip='' required grow>
+          <SecretInput
+              isConfigured={(secureJsonFields && secureJsonFields.token) as boolean}
+              value={secureJsonData.token}
+              placeholder="The Sneller authentication token"
+              onReset={onResetToken}
+              onChange={onTokenChange}
+              required
+          />
+        </InlineField>
+      </div>
   );
 }
