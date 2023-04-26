@@ -444,6 +444,10 @@ func iterateRows(input io.Reader, readRowFn func(reader ion.Reader, index int) e
 
 	index := 0
 	for reader.Next() {
+		if status != nil {
+			return nil, errors.New("unexpected data after ::final_status annotation")
+		}
+
 		if reader.Type() != ion.StructType {
 			return nil, fmt.Errorf("expected 'struct' type, got '%s'", reader.Type().String())
 		}
@@ -454,7 +458,8 @@ func iterateRows(input io.Reader, readRowFn func(reader ion.Reader, index int) e
 		}
 
 		// Fail on unexpected annotations
-		if len(annotations) != 0 && (len(annotations) != 1 || annotations[0].Text == nil || *annotations[0].Text != "final_status") {
+		if len(annotations) != 0 && (len(annotations) != 1 || annotations[0].Text == nil ||
+			(*annotations[0].Text != "final_status" && *annotations[0].Text != "query_error")) {
 			labels := make([]string, len(annotations))
 			for i := range annotations {
 				if annotations[0].Text != nil {
@@ -471,18 +476,26 @@ func iterateRows(input io.Reader, readRowFn func(reader ion.Reader, index int) e
 			return nil, err
 		}
 
-		// Parse ::final_status annotation
-		if len(annotations) != 0 {
-			status, err = readFinalStatus(reader)
+		if len(annotations) == 0 {
+			// Process data row
+			err = readRowFn(reader, index)
 			if err != nil {
 				return nil, err
 			}
-		}
-
-		// Process data row
-		err = readRowFn(reader, index)
-		if err != nil {
-			return nil, err
+		} else {
+			if *annotations[0].Text != "final_status" {
+				// Parse ::final_status annotation
+				status, err = readFinalStatus(reader)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				// Parse ::query_error annotation
+				status, err = readFinalStatus(reader)
+				if err != nil {
+					return nil, err
+				}
+			}
 		}
 
 		err = reader.StepOut()
@@ -531,14 +544,14 @@ func readFinalStatus(reader ion.Reader) (*snellerFinalStatus, error) {
 			status.Scanned = *value
 		case "result_set":
 			// Ignore for now
-		case "error":
+		case "error", "error_message":
 			value, err := reader.StringValue()
 			if err != nil {
 				return nil, err
 			}
 			status.Error = *value
 		default:
-			return nil, fmt.Errorf("unexpected ::final_status field '%s'", name)
+			return nil, fmt.Errorf("unexpected ::final_status or ::query_error field '%s'", name)
 		}
 
 	}
