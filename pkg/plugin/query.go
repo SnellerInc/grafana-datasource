@@ -444,6 +444,10 @@ func iterateRows(input io.Reader, readRowFn func(reader ion.Reader, index int) e
 
 	index := 0
 	for reader.Next() {
+		if status != nil {
+			return nil, errors.New("unexpected data after ::final_status annotation")
+		}
+
 		if reader.Type() != ion.StructType {
 			return nil, fmt.Errorf("expected 'struct' type, got '%s'", reader.Type().String())
 		}
@@ -471,18 +475,18 @@ func iterateRows(input io.Reader, readRowFn func(reader ion.Reader, index int) e
 			return nil, err
 		}
 
-		// Parse ::final_status annotation
-		if len(annotations) != 0 {
+		if len(annotations) == 0 {
+			// Process data row
+			err = readRowFn(reader, index)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// Parse ::final_status annotation
 			status, err = readFinalStatus(reader)
 			if err != nil {
 				return nil, err
 			}
-		}
-
-		// Process data row
-		err = readRowFn(reader, index)
-		if err != nil {
-			return nil, err
 		}
 
 		err = reader.StepOut()
