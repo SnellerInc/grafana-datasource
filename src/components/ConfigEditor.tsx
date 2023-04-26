@@ -31,21 +31,35 @@ export function ConfigEditor(props: Props) {
       value: 'eu-west-1'
     },
     {
+      label: 'Playground',
+      value: 'play'
+    },
+    {
       label: 'Custom Endpoint',
       value: 'custom',
     }
   ];
 
   const onRegionChange = (value: SelectableValue<string>, actionMeta: ActionMeta) => {
-    let endpoint = (value.value === 'custom')
-        ? options.jsonData.endpoint
-        : `https://snellerd-master.${value.value}.sneller-dev.io`
+    let endpoint = ''
+    switch (value.value) {
+      case 'custom':
+        endpoint = ''
+        break
+      case 'play':
+        endpoint = `https://play.sneller.io`
+        break
+      default:
+        endpoint = `https://snellerd-production.${value.value}.sneller.io`
+        break
+    }
 
     const jsonData = {
       ...options.jsonData,
       region: value.value,
       endpoint: endpoint,
     };
+
     onOptionsChange({ ...options, jsonData });
   };
 
@@ -86,29 +100,29 @@ export function ConfigEditor(props: Props) {
 
   return (
       <div className="gf-form-group">
-        <InlineField label="Sneller Region" labelWidth={24} tooltip='' grow>
+        <InlineField label="Sneller Region" labelWidth={24} tooltip='' required grow>
           <Select
               options={snellerRegions}
               onChange={onRegionChange}
               value={jsonData.region || 'us-east-1'}
           />
         </InlineField>
-        <InlineField label="Sneller Endpoint" labelWidth={24} tooltip='' disabled={jsonData.region !== 'custom'} required grow>
+        <InlineField label="Sneller Endpoint" labelWidth={24} tooltip='' disabled={jsonData.region !== 'custom'} required={jsonData.region === 'custom'} grow>
           <Input
               onChange={onEndpointChange}
               value={jsonData.endpoint}
               placeholder="The Sneller query endpoint"
-              required
+              required={jsonData.region === 'custom'}
           />
         </InlineField>
-        <InlineField label="Sneller Token" labelWidth={24} tooltip='' required grow>
+        <InlineField label="Sneller Token" labelWidth={24} tooltip='' disabled={jsonData.region === 'play'} required={jsonData.region !== 'play'} grow>
           <SecretInput
               isConfigured={(secureJsonFields && secureJsonFields.token) as boolean}
               value={secureJsonData.token}
               placeholder="The Sneller authentication token"
               onReset={onResetToken}
               onChange={onTokenChange}
-              required
+              required={jsonData.region !== 'play'}
           />
         </InlineField>
       </div>
