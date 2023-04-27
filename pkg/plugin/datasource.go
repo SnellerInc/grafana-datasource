@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
@@ -45,6 +46,8 @@ func NewDatasource(settings backend.DataSourceInstanceSettings) (instancemgmt.In
 	if err != nil {
 		return nil, fmt.Errorf("http client options: %w", err)
 	}
+
+	opts.Timeouts.Timeout = 10 * time.Minute
 
 	client, err := httpclient.New(opts)
 	if err != nil {
