@@ -274,6 +274,8 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, query b
 			switch resp.StatusCode {
 			case http.StatusUnauthorized:
 				return backend.ErrDataResponse(backend.StatusUnauthorized, fmt.Sprintf("unauthorized: %s", err))
+			case http.StatusForbidden:
+				return backend.ErrDataResponse(backend.StatusForbidden, fmt.Sprintf("forbidden: %s", err))
 			case http.StatusBadRequest:
 				return backend.ErrDataResponse(backend.StatusValidationFailed, fmt.Sprintf("bad request: %s", err))
 			}

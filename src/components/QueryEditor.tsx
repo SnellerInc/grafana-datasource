@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { InlineField, AsyncSelect, CodeEditor, ActionMeta } from '@grafana/ui';
+import { InlineField, AsyncSelect, ActionMeta } from '@grafana/ui';
 import { QueryEditorProps, SelectableValue } from '@grafana/data';
 import { DataSource } from '../datasource';
 import { SnellerDataSourceOptions, SnellerQuery } from '../types';
+import { SQLEditor } from '@grafana/experimental';
+import { SnellerLanguage } from "../sneller_sql";
 
 type Props = QueryEditorProps<DataSource, SnellerQuery, SnellerDataSourceOptions>;
 
@@ -78,12 +80,11 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
                     isSearchable={false}
                 />
             </InlineField>
-            <CodeEditor
-                height="200px"
-                showLineNumbers={true}
-                language="sql"
-                onBlur={onSqlChange}
-                value={sql!}
+            <SQLEditor
+                height={200}
+                onChange={onSqlChange}
+                query={sql!}
+                language={new SnellerLanguage()}
             />
         </div>
     );
