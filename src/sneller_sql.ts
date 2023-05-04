@@ -1,13 +1,5 @@
 import { monacoTypes } from '@grafana/ui';
-import { LanguageDefinition, SQLMonarchLanguage } from '@grafana/experimental';
-
-export class SnellerLanguage implements LanguageDefinition {
-    id = ''
-    loader = (module: any) => new Promise<{
-        language: SQLMonarchLanguage;
-        conf: monacoTypes.languages.LanguageConfiguration;
-    }>((resolve) => resolve({ language: language, conf: conf }))
-}
+import { SQLMonarchLanguage } from '@grafana/experimental';
 
 export const conf: monacoTypes.languages.LanguageConfiguration = {
     comments: {

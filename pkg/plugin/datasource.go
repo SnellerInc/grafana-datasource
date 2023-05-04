@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/amazon-ion/ion-go/ion"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
@@ -20,6 +21,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+	"golang.org/x/exp/maps"
 )
 
 // Make sure Datasource implements required interfaces. This is important to do
@@ -154,6 +156,13 @@ func (d *Datasource) CallResource(ctx context.Context, req *backend.CallResource
 			})
 		}
 		return sender.Send(d.handleCallResourceTables(ctx, segments[1]))
+	case "columns":
+		if len(segments) != 3 {
+			return sender.Send(&backend.CallResourceResponse{
+				Status: http.StatusBadRequest,
+			})
+		}
+		return sender.Send(d.handleCallResourceColumns(ctx, segments[1], segments[2]))
 	default:
 		return sender.Send(&backend.CallResourceResponse{
 			Status: http.StatusNotFound,
@@ -184,6 +193,27 @@ func (d *Datasource) handleCallResourceDatabases(ctx context.Context) *backend.C
 
 func (d *Datasource) handleCallResourceTables(ctx context.Context, database string) *backend.CallResourceResponse {
 	databases, status, err := d.getTables(ctx, database)
+	if err != nil {
+		return &backend.CallResourceResponse{
+			Status: status,
+			Body:   []byte(err.Error()),
+		}
+	}
+	result, err := json.Marshal(databases)
+	if err != nil {
+		return &backend.CallResourceResponse{
+			Status: status,
+			Body:   []byte(err.Error()),
+		}
+	}
+	return &backend.CallResourceResponse{
+		Status: http.StatusOK,
+		Body:   result,
+	}
+}
+
+func (d *Datasource) handleCallResourceColumns(ctx context.Context, database, table string) *backend.CallResourceResponse {
+	databases, status, err := d.getColumns(ctx, database, table)
 	if err != nil {
 		return &backend.CallResourceResponse{
 			Status: status,
@@ -315,4 +345,40 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, query b
 		Status: backend.StatusOK,
 		Frames: data.Frames{frame},
 	}
+}
+
+// getTables returns a list of table names for the given database.
+func (d *Datasource) getColumns(ctx context.Context, database, table string) ([]string, int, error) {
+	resp, err := d.executeQuery(ctx, database, fmt.Sprintf(`SELECT SNELLER_DATASHAPE(*) FROM (SELECT * FROM %s LIMIT 1000)`, table))
+	if err != nil {
+		if resp != nil {
+			return nil, resp.StatusCode, err
+		}
+		return nil, 500, err
+	}
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.DefaultLogger.Error("failed to close response body", "err", err)
+		}
+	}()
+
+	payload := map[string]any{}
+
+	err = ion.UnmarshalFrom(ion.NewReader(resp.Body), &payload)
+	if err != nil {
+		return nil, 500, err
+	}
+
+	fields, ok := payload["fields"]
+	if !ok {
+		return []string{}, 0, nil
+	}
+
+	vals, ok := fields.(map[string]any)
+	if !ok {
+		return []string{}, 0, nil
+	}
+
+	return maps.Keys(vals), 0, nil
 }

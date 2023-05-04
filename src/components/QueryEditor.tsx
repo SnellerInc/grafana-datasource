@@ -1,32 +1,28 @@
-import React, { useState } from 'react';
-import { InlineField, AsyncSelect, ActionMeta } from '@grafana/ui';
+import React, {useRef, useState} from 'react';
+import {InlineField, AsyncSelect, ActionMeta, monacoTypes, Monaco} from '@grafana/ui';
 import { QueryEditorProps, SelectableValue } from '@grafana/data';
 import { DataSource } from '../datasource';
 import { SnellerDataSourceOptions, SnellerQuery } from '../types';
-import { SQLEditor } from '@grafana/experimental';
-import { SnellerLanguage } from "../sneller_sql";
+import { getStandardSQLCompletionProvider, LanguageDefinition, SQLEditor, SQLMonarchLanguage } from '@grafana/experimental';
+import { language, conf } from "../sneller_sql";
+import { TableIdentifier } from "@grafana/experimental/dist/sql-editor/types";
 
 type Props = QueryEditorProps<DataSource, SnellerQuery, SnellerDataSourceOptions>;
 
 export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) {
-    const [database, setDatabase] = useState<string>(query.database || "");
-    const [table, setTable] = useState<string>("");
+
+    const [database, setDatabase] = useState<undefined | string>(query.database)
+    const databaseRef = useRef(database)
 
     const onDatabaseChange = (value: SelectableValue<string>, actionMeta: ActionMeta) => {
         onChange({ ...query, database: value?.value });
-        setDatabase(value?.value || "")
-        setTable("")
+        setDatabase(value?.value)
+        databaseRef.current = value?.value
     };
 
-    const onTableChange = (value: SelectableValue<string>, actionMeta: ActionMeta) => {
-        setTable(value?.value || "")
+    const onQueryChange = (q: string, processQuery: boolean) => {
+        onChange({ ...query, sql: q });
     };
-
-    const onSqlChange = (sql: string) => {
-        onChange({ ...query, sql });
-    };
-
-    const { sql } = query;
 
     const loadDatabaseOptions = async () => {
         try {
@@ -40,20 +36,53 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
         }
     };
 
-    const loadTableOptions = async () => {
+    const loadTableOptions = async (database?: string) => {
         if (!database) {
             return []
         }
         try {
             const response = await datasource.getResource('tables/' + database) as string[];
             return (response.map((x) => ({
-                label: x,
-                value: x,
+                name: x,
             })));
         } catch {
             return []
         }
     };
+
+    const loadColumnOptions = async (table: TableIdentifier) => {
+        if (!database || !table || !table.table) {
+            return []
+        }
+        try {
+            const response = await datasource.getResource('columns/' + database + '/' + table.table) as string[];
+            return (response.map((x) => ({
+                name: x,
+            })));
+        } catch {
+            return []
+        }
+    };
+
+    const snellerLanguageDefinition: LanguageDefinition = {
+        id: 'sneller_sql',
+        loader: () => new Promise<{
+            language: SQLMonarchLanguage;
+            conf: monacoTypes.languages.LanguageConfiguration;
+        }>((resolve) => resolve({ language: language, conf: conf })),
+        completionProvider: (m: Monaco, language?: SQLMonarchLanguage) => {
+            let provider = getStandardSQLCompletionProvider(m, language!)
+            provider.tables = {
+                resolve: async () => {
+                    return loadTableOptions(databaseRef.current)
+                }
+            };
+            provider.columns = {
+                resolve: loadColumnOptions
+            };
+            return provider;
+        }
+    }
 
     return (
         <div className="gf-form-group">
@@ -63,28 +92,16 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
                     cacheOptions
                     defaultOptions
                     onChange={onDatabaseChange}
-                    value={{ label: database, value: database }}
-                    isClearable
-                    isSearchable={false}
-                />
-            </InlineField>
-            <InlineField label="Table" labelWidth={24} tooltip="The table name" grow>
-                <AsyncSelect
-                    key={database}
-                    loadOptions={loadTableOptions}
-                    cacheOptions
-                    defaultOptions
-                    onChange={onTableChange}
-                    value={{ label: table, value: table }}
+                    value={ database ? { label: database, value: database } : undefined }
                     isClearable
                     isSearchable={false}
                 />
             </InlineField>
             <SQLEditor
                 height={200}
-                onChange={onSqlChange}
-                query={sql!}
-                language={new SnellerLanguage()}
+                onChange={onQueryChange}
+                query={query.sql!}
+                language={snellerLanguageDefinition}
             />
         </div>
     );
