@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/amazon-ion/ion-go/ion"
+	"github.com/SnellerInc/sneller/ion"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 )
 
@@ -24,7 +24,7 @@ func frameFromSnellerResult(refID, sql string, input io.Reader, timeField string
 
 	// Step 1: Derive schema
 
-	schema, err := deriveSchema(bytes.NewReader(b))
+	schema, err := deriveSchema(b)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func frameFromSnellerResult(refID, sql string, input io.Reader, timeField string
 		i++
 	}
 
-	_, err = iterateRows(bytes.NewReader(b), func(reader ion.Reader, index int) error {
+	_, err = iterateRows(b, func(reader *IonReader, index int) error {
 		return readRowValues(reader, index, fieldVals)
 	})
 
@@ -174,13 +174,13 @@ func grafanaFieldValues(name string, rowCount int, column *snellerColumn, isTime
 
 // ---
 
-func readJSON(reader ion.Reader) (json.RawMessage, error) {
-	value, _ := readJSONNullable(reader)
+func readJSON(r *IonReader) (json.RawMessage, error) {
+	value, _ := readJSONNullable(r)
 	return *value, nil
 }
 
-func readJSONNullable(reader ion.Reader) (*json.RawMessage, error) {
-	value, err := readValue(reader)
+func readJSONNullable(r *IonReader) (*json.RawMessage, error) {
+	value, err := r.ReadValue()
 	if err != nil {
 		return nil, err
 	}
@@ -193,95 +193,98 @@ func readJSONNullable(reader ion.Reader) (*json.RawMessage, error) {
 	return (*json.RawMessage)(&b), nil
 }
 
-func readBool(reader ion.Reader) (bool, error) {
-	value, _ := readBoolNullable(reader)
-	return *value, nil
+func readBool(r *IonReader) (bool, error) {
+	return r.ReadBool()
 }
 
-func readBoolNullable(reader ion.Reader) (*bool, error) {
-	return reader.BoolValue()
+func readBoolNullable(r *IonReader) (*bool, error) {
+	return r.ReadNullableBool()
 }
 
-func readInt64(reader ion.Reader) (int64, error) {
-	value, _ := readInt64Nullable(reader)
-	return *value, nil
+func readInt64(r *IonReader) (int64, error) {
+	return r.ReadInt()
 }
 
-func readInt64Nullable(reader ion.Reader) (*int64, error) {
-	return reader.Int64Value()
+func readInt64Nullable(r *IonReader) (*int64, error) {
+	return r.ReadNullableInt()
 }
 
-func readFloat64(reader ion.Reader) (float64, error) {
-	value, _ := readFloat64Nullable(reader)
-	return *value, nil
+func readFloat64(r *IonReader) (float64, error) {
+	return r.ReadNumber()
 }
 
-func readFloat64Nullable(reader ion.Reader) (*float64, error) {
-	if reader.Type() == ion.IntType {
-		value, _ := readInt64(reader)
-		fvalue := float64(value)
-		return &fvalue, nil
+func readFloat64Nullable(r *IonReader) (*float64, error) {
+	return r.ReadNullableNumber()
+}
+
+func readString(r *IonReader) (string, error) {
+	return r.ReadText()
+}
+
+func readStringNullable(r *IonReader) (*string, error) {
+	return r.ReadNullableText()
+}
+
+func readTime(r *IonReader) (time.Time, error) {
+	value, err := r.ReadTimestamp()
+	if err != nil {
+		return time.Time{}, err
 	}
-
-	return reader.FloatValue()
+	return value.Time(), nil
 }
 
-func readString(reader ion.Reader) (string, error) {
-	value, _ := readStringNullable(reader)
-	return *value, nil
-}
-
-func readStringNullable(reader ion.Reader) (*string, error) {
-	if reader.Type() == ion.SymbolType {
-		value, _ := reader.SymbolValue()
-		return convertSymbolValue(value), nil
+func readTimeNullable(r *IonReader) (*time.Time, error) {
+	if r.Type() == ion.NullType {
+		return nil, r.ReadNull()
 	}
-
-	return reader.StringValue()
-}
-
-func readTime(reader ion.Reader) (time.Time, error) {
-	value, _ := readTimeNullable(reader)
-	return *value, nil
-}
-
-func readTimeNullable(reader ion.Reader) (*time.Time, error) {
-	value, _ := reader.TimestampValue()
-	return convertTimestampValue(value), nil
-}
-
-func readTimeFromInt64(reader ion.Reader) (time.Time, error) {
-	value, _ := readTimeFromInt64Nullable(reader)
-	return *value, nil
-}
-
-func readTimeFromInt64Nullable(reader ion.Reader) (*time.Time, error) {
-	value, _ := readInt64Nullable(reader)
-	if value == nil {
-		return nil, nil
-	}
-
-	result := time.UnixMilli(*value)
-
-	return &result, nil
-}
-
-func readTimeFromString(reader ion.Reader) (time.Time, error) {
-	value, _ := readTimeFromStringNullable(reader)
-	return *value, nil
-}
-
-func readTimeFromStringNullable(reader ion.Reader) (*time.Time, error) {
-	value, _ := readStringNullable(reader)
-	if value == nil {
-		return nil, nil
-	}
-
-	result, err := time.Parse(time.RFC3339, *value)
+	value, err := readTime(r)
 	if err != nil {
 		return nil, err
 	}
+	return &value, nil
+}
 
+func readTimeFromInt64(r *IonReader) (time.Time, error) {
+	value, err := r.ReadInt()
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.UnixMilli(value), nil
+}
+
+func readTimeFromInt64Nullable(r *IonReader) (*time.Time, error) {
+	if r.Type() == ion.NullType {
+		return nil, r.ReadNull()
+	}
+	result, err := readTimeFromInt64(r)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func readTimeFromString(r *IonReader) (time.Time, error) {
+	value, err := r.ReadString()
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	result, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return result, nil
+}
+
+func readTimeFromStringNullable(r *IonReader) (*time.Time, error) {
+	if r.Type() == ion.NullType {
+		return nil, r.ReadNull()
+	}
+	result, err := readTimeFromString(r)
+	if err != nil {
+		return nil, err
+	}
 	return &result, nil
 }
 
@@ -307,6 +310,8 @@ func snellerType(typ ion.Type) snellerColumnType {
 		return snellerTypeNull
 	case ion.BoolType:
 		return snellerTypeBool
+	case ion.UintType:
+		return snellerTypeNumber
 	case ion.IntType:
 		return snellerTypeNumber
 	case ion.FloatType:
@@ -334,14 +339,19 @@ type snellerColumn struct {
 	Nullable bool              // The column supports 'null' values
 	Optional bool              // The column supports 'missing' values
 	Floating bool              // The column contains at least one floating point numeric value
+	Signed   bool              // The column contains at least one signed numeric value
 	Count    int               // The number of rows containing a value for this column
 }
 
 type snellerFinalStatus struct {
-	Hits    int64
-	Misses  int64
-	Scanned int64
-	Error   string
+	Hits    int64  `ion:"hits"`
+	Misses  int64  `ion:"misses"`
+	Scanned int64  `ion:"scanned"`
+	Error   string `ion:"error"`
+}
+
+type snellerQueryError struct {
+	Error string `ion:"error"`
 }
 
 // snellerSchema represents the derived schema of a Sneller query result-set.
@@ -351,13 +361,13 @@ type snellerSchema struct {
 	FinalStatus *snellerFinalStatus       // The final query status
 }
 
-func deriveSchema(input io.Reader) (*snellerSchema, error) {
+func deriveSchema(buf []byte) (*snellerSchema, error) {
 	schema := snellerSchema{
 		RowCount: 0,
 		Columns:  map[string]*snellerColumn{},
 	}
 
-	status, err := iterateRows(input, func(reader ion.Reader, index int) error {
+	status, err := iterateRows(buf, func(reader *IonReader, index int) error {
 		schema.RowCount += 1
 		return analyzeRow(reader, &schema)
 	})
@@ -377,27 +387,25 @@ func deriveSchema(input io.Reader) (*snellerSchema, error) {
 	return &schema, nil
 }
 
-func analyzeRow(reader ion.Reader, schema *snellerSchema) error {
+func analyzeRow(reader *IonReader, schema *snellerSchema) error {
 	index := 0
 	for reader.Next() {
-		sym, err := reader.FieldName()
+		name, err := reader.FieldName()
 		if err != nil {
 			return err
 		}
-		if sym == nil || sym.Text == nil {
-			continue
-		}
 
-		name := *sym.Text
-		typ := snellerType(reader.Type())
+		ionType := reader.Type()
+		snellerType := snellerType(ionType)
 
 		col, ok := schema.Columns[name]
 		if !ok {
 			col = &snellerColumn{
 				Index:    index,
 				Name:     name,
-				Typ:      typ,
-				Nullable: typ == snellerTypeNull,
+				Typ:      snellerType,
+				Nullable: snellerType == snellerTypeNull,
+				Signed:   ionType == ion.IntType || ionType == ion.FloatType,
 				Optional: schema.RowCount != 1,
 				Count:    0,
 			}
@@ -410,15 +418,15 @@ func analyzeRow(reader ion.Reader, schema *snellerSchema) error {
 		col.Count++
 
 		// Adjust column type if required
-		if typ != col.Typ {
-			if typ == snellerTypeNull {
+		if snellerType != col.Typ {
+			if snellerType == snellerTypeNull {
 				// At least one row contains a non-null value for the current field
 				// -> keep type and mark row as 'nullable'
 				col.Nullable = true
 			} else if col.Typ == snellerTypeNull {
 				// All rows contain null values for the current field
 				// -> set current type as the new row type
-				col.Typ = typ
+				col.Typ = snellerType
 			} else {
 				// The column has an ambiguous type
 				col.Typ = snellerTypeUnknown
@@ -426,21 +434,27 @@ func analyzeRow(reader ion.Reader, schema *snellerSchema) error {
 		}
 
 		// Additional meta info for numeric fields
-		if reader.Type() == ion.FloatType {
-			col.Floating = true
+		if snellerType == snellerTypeNumber {
+			if ionType == ion.FloatType {
+				col.Floating = true
+				col.Signed = true
+			} else if ionType == ion.IntType {
+				col.Signed = true
+			}
+			// TODO: Required bits
 		}
-		// TODO: Required bits
-		// TODO: Signedness
 
 		index++
 	}
-
-	return reader.Err()
+	return reader.Error()
 }
 
-func iterateRows(input io.Reader, readRowFn func(reader ion.Reader, index int) error) (*snellerFinalStatus, error) {
+func iterateRows(buf []byte, readRowFn func(reader *IonReader, index int) error) (*snellerFinalStatus, error) {
+	reader := NewReader(bytes.NewReader(buf), 1024*1024*10) // 10 MiB
+
+	var finalStatus snellerFinalStatus
+	var queryError snellerQueryError
 	var status *snellerFinalStatus
-	reader := ion.NewReader(input)
 
 	index := 0
 	for reader.Next() {
@@ -448,8 +462,9 @@ func iterateRows(input io.Reader, readRowFn func(reader ion.Reader, index int) e
 			return nil, errors.New("unexpected data after ::final_status annotation")
 		}
 
-		if reader.Type() != ion.StructType {
-			return nil, fmt.Errorf("expected 'struct' type, got '%s'", reader.Type().String())
+		t := reader.Type()
+		if t != ion.StructType {
+			return nil, fmt.Errorf("expected 'struct' type, got '%s'", t)
 		}
 
 		annotations, err := reader.Annotations()
@@ -457,120 +472,59 @@ func iterateRows(input io.Reader, readRowFn func(reader ion.Reader, index int) e
 			return nil, err
 		}
 
-		// Fail on unexpected annotations
-		if len(annotations) != 0 && (len(annotations) != 1 || annotations[0].Text == nil ||
-			(*annotations[0].Text != "final_status" && *annotations[0].Text != "query_error")) {
-			labels := make([]string, len(annotations))
-			for i := range annotations {
-				if annotations[0].Text != nil {
-					labels[i] = *annotations[i].Text
-				} else {
-					labels[i] = "%missing%"
+		if annotations != nil {
+			switch annotations[0] {
+			case "final_status":
+				err = reader.Unmarshal(&finalStatus)
+				if err != nil {
+					break
 				}
+				status = &finalStatus
+				continue
+			case "query_error":
+				err = reader.Unmarshal(&queryError)
+				if err != nil {
+					break
+				}
+				continue
+			default:
+				return nil, fmt.Errorf("unexpected annotation: [%s]", strings.Join(annotations, ", "))
 			}
-			return nil, fmt.Errorf("unexpected annotations: [%s]", strings.Join(labels, ", "))
 		}
 
 		err = reader.StepIn()
 		if err != nil {
-			return nil, err
+			break
 		}
 
-		if len(annotations) == 0 {
-			// Process data row
-			err = readRowFn(reader, index)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			if *annotations[0].Text != "final_status" {
-				// Parse ::final_status annotation
-				status, err = readFinalStatus(reader)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				// Parse ::query_error annotation
-				status, err = readFinalStatus(reader)
-				if err != nil {
-					return nil, err
-				}
-			}
+		err = readRowFn(reader, index)
+		if err != nil {
+			break
 		}
 
 		err = reader.StepOut()
 		if err != nil {
-			return nil, err
+			break
 		}
 
 		index++
 	}
 
-	return status, reader.Err()
+	return status, reader.Error()
 }
 
-func readFinalStatus(reader ion.Reader) (*snellerFinalStatus, error) {
-	var status = snellerFinalStatus{}
-
-	for reader.Next() {
-		sym, err := reader.FieldName()
-		if err != nil {
-			return nil, err
-		}
-		if sym == nil || sym.Text == nil {
-			continue
-		}
-
-		name := *sym.Text
-
-		switch name {
-		case "hits":
-			value, err := reader.Int64Value()
-			if err != nil {
-				return nil, err
-			}
-			status.Hits = *value
-		case "misses":
-			value, err := reader.Int64Value()
-			if err != nil {
-				return nil, err
-			}
-			status.Misses = *value
-		case "scanned":
-			value, err := reader.Int64Value()
-			if err != nil {
-				return nil, err
-			}
-			status.Scanned = *value
-		case "result_set":
-			// Ignore for now
-		case "error", "error_message":
-			value, err := reader.StringValue()
-			if err != nil {
-				return nil, err
-			}
-			status.Error = *value
-		default:
-			return nil, fmt.Errorf("unexpected ::final_status or ::query_error field '%s'", name)
-		}
-
-	}
-
-	return &status, reader.Err()
-}
-
-type fieldReadFunc = func(reader ion.Reader, rowIndex int) error
+type fieldReadFunc = func(reader *IonReader, rowIndex int) error
 
 type fieldValues struct {
 	Name   string        // The field name
 	Values any           // The field values for each row (Go: *[]T)
-	ReadFn fieldReadFunc // The read function
+	ReadFn fieldReadFunc // The peek function
 }
 
-func newFieldValues[T any](name string, rowCount int, fn func(reader ion.Reader) (T, error)) *fieldValues {
+func newFieldValues[T any](name string, rowCount int, fn func(r *IonReader) (T, error)) *fieldValues {
 	values := make([]T, rowCount)
-	readFn := func(reader ion.Reader, index int) error {
-		value, err := fn(reader)
+	readFn := func(r *IonReader, index int) error {
+		value, err := fn(r)
 		if err != nil {
 			return err
 		}
@@ -581,17 +535,12 @@ func newFieldValues[T any](name string, rowCount int, fn func(reader ion.Reader)
 	return &fieldValues{Name: name, Values: values, ReadFn: readFn}
 }
 
-func readRowValues(reader ion.Reader, index int, fieldValues []*fieldValues) error {
+func readRowValues(reader *IonReader, index int, fieldValues []*fieldValues) error {
 	for reader.Next() {
-		sym, err := reader.FieldName()
+		name, err := reader.FieldName()
 		if err != nil {
 			return err
 		}
-		if sym == nil || sym.Text == nil {
-			continue
-		}
-
-		name := *sym.Text
 
 		for _, field := range fieldValues {
 			if name != field.Name {
@@ -605,128 +554,5 @@ func readRowValues(reader ion.Reader, index int, fieldValues []*fieldValues) err
 		}
 	}
 
-	return reader.Err()
-}
-
-// ---
-
-func readValue(reader ion.Reader) (any, error) {
-	var value any
-
-	switch reader.Type() {
-	case ion.NullType:
-		return (*struct{})(nil), nil
-	case ion.BoolType:
-		value, _ = reader.BoolValue()
-	case ion.IntType:
-		value, _ = reader.Int64Value()
-	case ion.FloatType:
-		value, _ = reader.FloatValue()
-	case ion.TimestampType:
-		val, _ := reader.TimestampValue()
-		value = convertTimestampValue(val)
-	case ion.SymbolType:
-		val, _ := reader.SymbolValue()
-		value = convertSymbolValue(val)
-	case ion.StringType:
-		value, _ = reader.StringValue()
-	case ion.StructType:
-		val, err := readStruct(reader)
-		if err != nil {
-			return nil, err
-		}
-		value = val
-	case ion.ListType:
-		val, err := readList(reader)
-		if err != nil {
-			return nil, err
-		}
-		value = val
-	default:
-		return nil, fmt.Errorf("unsupported ION type '%s'", reader.Type())
-	}
-
-	return value, nil
-}
-
-func readStruct(reader ion.Reader) (map[string]any, error) {
-	result := map[string]any{}
-
-	err := reader.StepIn()
-	if err != nil {
-		return nil, err
-	}
-
-	for reader.Next() {
-		sym, err := reader.FieldName()
-		if err != nil {
-			return nil, err
-		}
-		if sym == nil || sym.Text == nil {
-			continue
-		}
-
-		name := *sym.Text
-
-		value, err := readValue(reader)
-		if err != nil {
-			return nil, err
-		}
-
-		result[name] = value
-	}
-
-	if reader.Err() != nil {
-		return nil, reader.Err()
-	}
-
-	err = reader.StepOut()
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
-}
-
-func readList(reader ion.Reader) ([]any, error) {
-	var result []any
-
-	err := reader.StepIn()
-	if err != nil {
-		return nil, err
-	}
-
-	for reader.Next() {
-		value, err := readValue(reader)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, value)
-	}
-
-	if reader.Err() != nil {
-		return nil, reader.Err()
-	}
-
-	err = reader.StepOut()
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
-}
-
-func convertTimestampValue(value *ion.Timestamp) *time.Time {
-	if value == nil {
-		return nil
-	}
-	result := value.GetDateTime()
-	return &result
-}
-
-func convertSymbolValue(value *ion.SymbolToken) *string {
-	if value == nil || value.Text == nil {
-		return nil
-	}
-	return value.Text
+	return reader.Error()
 }
