@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/amazon-ion/ion-go/ion"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
@@ -19,9 +18,9 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/tracing"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
+	cache "github.com/patrickmn/go-cache"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"golang.org/x/exp/maps"
 )
 
 // Make sure Datasource implements required interfaces. This is important to do
@@ -60,6 +59,7 @@ func NewDatasource(settings backend.DataSourceInstanceSettings) (instancemgmt.In
 		settings: settings,
 		endpoint: jsonData.Endpoint,
 		client:   client,
+		cache:    cache.New(5*time.Minute, 5*time.Minute),
 	}
 
 	mux := datasource.NewQueryTypeMux()
@@ -78,6 +78,7 @@ type Datasource struct {
 	handler  backend.QueryDataHandler
 	endpoint string
 	client   *http.Client
+	cache    *cache.Cache
 }
 
 // Dispose here tells plugin SDK that plugin wants to clean up resources when a new instance
@@ -345,40 +346,4 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, query b
 		Status: backend.StatusOK,
 		Frames: data.Frames{frame},
 	}
-}
-
-// getTables returns a list of table names for the given database.
-func (d *Datasource) getColumns(ctx context.Context, database, table string) ([]string, int, error) {
-	resp, err := d.executeQuery(ctx, database, fmt.Sprintf(`SELECT SNELLER_DATASHAPE(*) FROM (SELECT * FROM %s LIMIT 1000)`, table))
-	if err != nil {
-		if resp != nil {
-			return nil, resp.StatusCode, err
-		}
-		return nil, 500, err
-	}
-
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.DefaultLogger.Error("failed to close response body", "err", err)
-		}
-	}()
-
-	payload := map[string]any{}
-
-	err = ion.UnmarshalFrom(ion.NewReader(resp.Body), &payload)
-	if err != nil {
-		return nil, 500, err
-	}
-
-	fields, ok := payload["fields"]
-	if !ok {
-		return []string{}, 0, nil
-	}
-
-	vals, ok := fields.(map[string]any)
-	if !ok {
-		return []string{}, 0, nil
-	}
-
-	return maps.Keys(vals), 0, nil
 }
