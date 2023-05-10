@@ -41,7 +41,7 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
             return []
         }
         try {
-            const response = await datasource.getResource('tables/' + database) as string[];
+            const response = await datasource.getResource('tables/' + encodeURIComponent(database)) as string[];
             return (response.map((x) => ({
                 name: x,
             })));
@@ -55,7 +55,9 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
             return []
         }
         try {
-            const response = await datasource.getResource('columns/' + database + '/' + table.table) as string[];
+            const response = await datasource.getResource(
+                'columns/' + encodeURIComponent(database) + '/' + encodeURIComponent(table.table)
+            ) as string[];
             return (response.map((x) => ({
                 name: x,
             })));

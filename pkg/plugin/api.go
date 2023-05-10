@@ -106,7 +106,7 @@ func (d *Datasource) getColumns(ctx context.Context, database, table string) ([]
 		return cached.([]string), 0, nil
 	}
 
-	resp, err := d.executeQuery(ctx, database, fmt.Sprintf(`SELECT SNELLER_DATASHAPE(*) FROM (SELECT * FROM %s LIMIT 1000)`, table))
+	resp, err := d.executeQuery(ctx, database, fmt.Sprintf(`SELECT SNELLER_DATASHAPE(*) FROM (SELECT * FROM %q LIMIT 1000)`, table))
 	if err != nil {
 		if resp != nil {
 			return nil, resp.StatusCode, err
