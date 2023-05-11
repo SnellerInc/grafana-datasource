@@ -43,8 +43,6 @@ github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAE
 github.com/SnellerInc/sneller v0.0.0-20230505151417-5806cd3a42c7 h1:3GAYAlEQoiW3q8x88cbi140EM1p3g8vBHxqWS75Oro8=
 github.com/SnellerInc/sneller v0.0.0-20230505151417-5806cd3a42c7/go.mod h1:BaisUxgu4MI9tL6dwYPccGKsXkBP7+BnMz8fL/F/TNk=
 github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af/go.mod h1:K08gAheRH3/J6wwsYMMT4xOr94bZjxIelGM0+d/wbFw=
-github.com/amazon-ion/ion-go v1.2.0 h1:EgFy23/7gRxRYdUkJARh/7eZc8BYkFFDZZSqB3PwVqQ=
-github.com/amazon-ion/ion-go v1.2.0/go.mod h1:3ZEje8i20TiIPVZlN+KE3B2ppZ1B8d9F/KaT7Dtec+k=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/apache/arrow/go/arrow v0.0.0-20211112161151-bc219186db40 h1:q4dksr6ICHXqG5hm0ZW5IHyeEJXoIJSOZeBLmWPNeIQ=
 github.com/apache/arrow/go/arrow v0.0.0-20211112161151-bc219186db40/go.mod h1:Q7yQnSMnLvcXlZ8RV+jwz/6y1rQTqbX6C82SndT52Zs=

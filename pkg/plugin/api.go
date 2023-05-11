@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/amazon-ion/ion-go/ion"
+	"github.com/SnellerInc/sneller/ion"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"golang.org/x/exp/maps"
 )
@@ -122,7 +122,7 @@ func (d *Datasource) getColumns(ctx context.Context, database, table string) ([]
 
 	payload := map[string]any{}
 
-	err = ion.UnmarshalFrom(ion.NewReader(resp.Body), &payload)
+	err = ion.NewDecoder(resp.Body, 1024*1024*10).Decode(&payload)
 	if err != nil {
 		return nil, 500, err
 	}

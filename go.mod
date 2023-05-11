@@ -4,7 +4,6 @@ go 1.19
 
 require (
 	github.com/SnellerInc/sneller v0.0.0-20230505151417-5806cd3a42c7
-	github.com/amazon-ion/ion-go v1.2.0
 	github.com/grafana/grafana-plugin-sdk-go v0.159.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	go.opentelemetry.io/otel v1.14.0
