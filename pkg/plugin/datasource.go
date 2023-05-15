@@ -18,6 +18,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/tracing"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
+	cache "github.com/patrickmn/go-cache"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -58,6 +59,7 @@ func NewDatasource(settings backend.DataSourceInstanceSettings) (instancemgmt.In
 		settings: settings,
 		endpoint: jsonData.Endpoint,
 		client:   client,
+		cache:    cache.New(5*time.Minute, 5*time.Minute),
 	}
 
 	mux := datasource.NewQueryTypeMux()
@@ -76,6 +78,7 @@ type Datasource struct {
 	handler  backend.QueryDataHandler
 	endpoint string
 	client   *http.Client
+	cache    *cache.Cache
 }
 
 // Dispose here tells plugin SDK that plugin wants to clean up resources when a new instance
@@ -154,6 +157,13 @@ func (d *Datasource) CallResource(ctx context.Context, req *backend.CallResource
 			})
 		}
 		return sender.Send(d.handleCallResourceTables(ctx, segments[1]))
+	case "columns":
+		if len(segments) != 3 {
+			return sender.Send(&backend.CallResourceResponse{
+				Status: http.StatusBadRequest,
+			})
+		}
+		return sender.Send(d.handleCallResourceColumns(ctx, segments[1], segments[2]))
 	default:
 		return sender.Send(&backend.CallResourceResponse{
 			Status: http.StatusNotFound,
@@ -184,6 +194,27 @@ func (d *Datasource) handleCallResourceDatabases(ctx context.Context) *backend.C
 
 func (d *Datasource) handleCallResourceTables(ctx context.Context, database string) *backend.CallResourceResponse {
 	databases, status, err := d.getTables(ctx, database)
+	if err != nil {
+		return &backend.CallResourceResponse{
+			Status: status,
+			Body:   []byte(err.Error()),
+		}
+	}
+	result, err := json.Marshal(databases)
+	if err != nil {
+		return &backend.CallResourceResponse{
+			Status: status,
+			Body:   []byte(err.Error()),
+		}
+	}
+	return &backend.CallResourceResponse{
+		Status: http.StatusOK,
+		Body:   result,
+	}
+}
+
+func (d *Datasource) handleCallResourceColumns(ctx context.Context, database, table string) *backend.CallResourceResponse {
+	databases, status, err := d.getColumns(ctx, database, table)
 	if err != nil {
 		return &backend.CallResourceResponse{
 			Status: status,
@@ -274,6 +305,8 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, query b
 			switch resp.StatusCode {
 			case http.StatusUnauthorized:
 				return backend.ErrDataResponse(backend.StatusUnauthorized, fmt.Sprintf("unauthorized: %s", err))
+			case http.StatusForbidden:
+				return backend.ErrDataResponse(backend.StatusForbidden, fmt.Sprintf("forbidden: %s", err))
 			case http.StatusBadRequest:
 				return backend.ErrDataResponse(backend.StatusValidationFailed, fmt.Sprintf("bad request: %s", err))
 			}

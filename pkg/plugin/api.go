@@ -8,8 +8,11 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/SnellerInc/sneller/ion"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
+	"golang.org/x/exp/maps"
 )
 
 // executeQuery executes a Sneller query and returns the HTTP response.
@@ -21,6 +24,12 @@ func (d *Datasource) executeQuery(ctx context.Context, database, sql string) (*h
 
 // getDatabases returns a list of database names.
 func (d *Datasource) getDatabases(ctx context.Context) ([]string, int, error) {
+	key := "databases"
+	cached, found := d.cache.Get(key)
+	if found {
+		return cached.([]string), 0, nil
+	}
+
 	resp, err := d.executeRequest(ctx, http.MethodGet, "/databases", nil,
 		map[string]string{"Accept": "application/json"},
 		nil)
@@ -48,11 +57,19 @@ func (d *Datasource) getDatabases(ctx context.Context) ([]string, int, error) {
 		return t.Name
 	})
 
+	d.cache.Set(key, names, time.Minute*1)
+
 	return names, 0, nil
 }
 
 // getTables returns a list of table names for the given database.
 func (d *Datasource) getTables(ctx context.Context, database string) ([]string, int, error) {
+	key := fmt.Sprintf("tables_%s", database)
+	cached, found := d.cache.Get(key)
+	if found {
+		return cached.([]string), 0, nil
+	}
+
 	resp, err := d.executeRequest(ctx, http.MethodGet, "/tables", nil,
 		map[string]string{"Accept": "application/json"},
 		map[string]string{"database": database})
@@ -76,7 +93,55 @@ func (d *Datasource) getTables(ctx context.Context, database string) ([]string, 
 		return nil, 500, err
 	}
 
+	d.cache.Set(key, result, time.Minute*1)
+
 	return result, 0, nil
+}
+
+// getColumns returns a list of column names for the given database and table.
+func (d *Datasource) getColumns(ctx context.Context, database, table string) ([]string, int, error) {
+	key := fmt.Sprintf("columns_%s_%s", database, table)
+	cached, found := d.cache.Get(key)
+	if found {
+		return cached.([]string), 0, nil
+	}
+
+	resp, err := d.executeQuery(ctx, database, fmt.Sprintf(`SELECT SNELLER_DATASHAPE(*) FROM (SELECT * FROM %q LIMIT 1000)`, table))
+	if err != nil {
+		if resp != nil {
+			return nil, resp.StatusCode, err
+		}
+		return nil, 500, err
+	}
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.DefaultLogger.Error("failed to close response body", "err", err)
+		}
+	}()
+
+	payload := map[string]any{}
+
+	err = ion.NewDecoder(resp.Body, 1024*1024*10).Decode(&payload)
+	if err != nil {
+		return nil, 500, err
+	}
+
+	fields, ok := payload["fields"]
+	if !ok {
+		return []string{}, 0, nil
+	}
+
+	vals, ok := fields.(map[string]any)
+	if !ok {
+		return []string{}, 0, nil
+	}
+
+	cols := maps.Keys(vals)
+
+	d.cache.Set(key, cols, time.Minute*1)
+
+	return cols, 0, nil
 }
 
 // newRequest creates a new HTTP request and initializes the 'Authentication' header from the
