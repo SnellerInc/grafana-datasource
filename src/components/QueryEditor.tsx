@@ -1,4 +1,4 @@
-import React, {useRef, useState} from 'react';
+import React, { useRef } from 'react';
 import {InlineField, AsyncSelect, ActionMeta, monacoTypes, Monaco} from '@grafana/ui';
 import { QueryEditorProps, SelectableValue } from '@grafana/data';
 import { DataSource } from '../datasource';
@@ -11,17 +11,15 @@ type Props = QueryEditorProps<DataSource, SnellerQuery, SnellerDataSourceOptions
 
 export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) {
 
-    const [database, setDatabase] = useState<undefined | string>(query.database)
-    const databaseRef = useRef(database)
+    const databaseRef = useRef(query.database)
 
     const onDatabaseChange = (value: SelectableValue<string>, actionMeta: ActionMeta) => {
         onChange({ ...query, database: value?.value });
-        setDatabase(value?.value)
         databaseRef.current = value?.value
     };
 
     const onQueryChange = (q: string, processQuery: boolean) => {
-        onChange({ ...query, sql: q });
+        onChange({ ...query, database: databaseRef.current, sql: q });
     };
 
     const loadDatabaseOptions = async () => {
@@ -51,12 +49,12 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
     };
 
     const loadColumnOptions = async (table: TableIdentifier) => {
-        if (!database || !table || !table.table) {
+        if (!databaseRef || !table || !table.table) {
             return []
         }
         try {
             const response = await datasource.getResource(
-                'columns/' + encodeURIComponent(database) + '/' + encodeURIComponent(table.table)
+                'columns/' + encodeURIComponent(databaseRef.current!) + '/' + encodeURIComponent(table.table)
             ) as string[];
             return (response.map((x) => ({
                 name: x,
@@ -94,7 +92,7 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
                     cacheOptions
                     defaultOptions
                     onChange={onDatabaseChange}
-                    value={ database ? { label: database, value: database } : undefined }
+                    value={ databaseRef ? { label: databaseRef.current!, value: databaseRef.current! } : undefined }
                     isClearable
                     isSearchable={false}
                 />
