@@ -40,9 +40,9 @@ func (b *bufferReader) Peek(n int) ([]byte, error) {
 		return b.r.Peek(n)
 	}
 	if len(b.buf) < n {
-		return nil, io.EOF
+		return b.buf, io.EOF
 	}
-	return b.buf, nil
+	return b.buf[:n], nil
 }
 
 func (b *bufferReader) Discard(n int) (discarded int, err error) {
@@ -52,7 +52,7 @@ func (b *bufferReader) Discard(n int) (discarded int, err error) {
 	if n == 0 {
 		return
 	}
-	b.buf = b.buf[:n]
+	b.buf = b.buf[n:]
 	return n, nil
 }
 
@@ -75,6 +75,26 @@ func NewReader(r io.Reader, max int) *IonReader {
 func (r *IonReader) Next() bool {
 	if r.ctx.size != 0 {
 		r.ctx.src.Discard(r.ctx.size)
+	}
+
+	if r.inStruct() {
+		buf, err := r.ctx.src.Peek(8)
+		if len(buf) == 0 {
+			if err == nil {
+				err = io.ErrUnexpectedEOF
+			}
+			r.ctx.err = err
+			goto handleError
+		}
+
+		sym, rest, err := ion.ReadLabel(buf)
+		if err != nil {
+			r.ctx.err = err
+			goto handleError
+		}
+
+		r.ctx.label = &sym
+		r.ctx.src.Discard(len(buf) - len(rest))
 	}
 
 	r.ctx.annotations = nil
@@ -112,28 +132,6 @@ func (r *IonReader) Next() bool {
 		}
 
 		r.ctx.src.Discard(len(buf) - len(rest))
-	}
-
-	if r.inStruct() {
-		buf, err := r.ctx.src.Peek(r.ctx.size)
-		if err != nil {
-			r.ctx.err = err
-			goto handleError
-		}
-
-		sym, rest, err := ion.ReadLabel(buf)
-		if err != nil {
-			r.ctx.err = err
-			goto handleError
-		}
-
-		r.ctx.label = &sym
-		r.ctx.src.Discard(len(buf) - len(rest))
-
-		r.ctx.typ, r.ctx.size, r.ctx.err = ionPeek(r.ctx.src)
-		if r.ctx.err != nil {
-			goto handleError
-		}
 	}
 
 	return true
