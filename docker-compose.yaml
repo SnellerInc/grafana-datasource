@@ -2,7 +2,7 @@ version: '3.0'
 
 services:
   grafana:
-    container_name: 'snellerinc-sneller-datasource'
+    container_name: 'sneller-sneller-datasource'
     build:
       context: ./.config
       args:
@@ -10,5 +10,5 @@ services:
     ports:
       - 3000:3000/tcp
     volumes:
-      - ./dist:/var/lib/grafana/plugins/snellerinc-sneller-datasource
+      - ./dist:/var/lib/grafana/plugins/sneller-sneller-datasource
       - ./provisioning:/etc/grafana/provisioning

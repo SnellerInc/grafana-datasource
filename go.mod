@@ -1,4 +1,4 @@
-module github.com/sneller-inc/sneller
+module github.com/SnellerInc/grafana-datasource
 
 go 1.19
 
