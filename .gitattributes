@@ -1,0 +1,59 @@
+### Git Line Endings ###############################################################################
+
+# Set default behavior to automatically normalize line endings
+* text=auto
+
+# Documents
+*.md       text diff=markdown
+*.mdx      text diff=markdown
+
+# Serialization
+*.json     text
+*.toml     text
+*.xml      text
+*.yaml     text eol=lf
+*.yml      text eol=lf
+*.ion      binary
+*.10n      binary
+
+# Graphics
+*.eps      binary
+*.gif      binary
+*.ico      binary
+*.jpg      binary
+*.jpeg     binary
+*.png      binary
+*.tif      binary
+*.tiff     binary
+
+# Force batch scripts to always use CRLF line endings
+*.bat      text eol=crlf
+*.cmd      text eol=crlf
+*.ps1      text eol=crlf
+
+# Force bash scripts to always use LF line endings
+*.bash     text eol=lf
+*.fish     text eol=lf
+*.sh       text eol=lf
+*.zsh      text eol=lf
+
+# Text files where line endings should be preserved
+*.patch    -text
+
+### Go #############################################################################################
+
+*.go       text eol=lf diff=golang
+
+### TypeScript #####################################################################################
+
+*.js       text eol=lf
+*.ts       text eol=lf
+*.tsx      text eol=lf
+
+### Exclude files from exporting ###################################################################
+
+.gitattributes export-ignore
+.gitignore     export-ignore
+.gitkeep       export-ignore
+
+####################################################################################################

@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/grafana/grafana/master/docs/sources/developers/plugins/plugin.schema.json",
   "type": "datasource",
   "name": "Sneller",
-  "id": "snellerinc-sneller-datasource",
+  "id": "sneller-sneller-datasource",
   "metrics": true,
   "backend": true,
   "alerting": true,
@@ -18,7 +18,16 @@
       "large": "img/logo.png"
     },
     "links": [],
-    "screenshots": [],
+    "screenshots": [
+      {
+        "name": "Config Editor",
+        "path": "img/screenshot_config.png"
+      },
+      {
+        "name": "Query Editor",
+        "path": "img/screenshot_query.png"
+      }
+    ],
     "version": "%VERSION%",
     "updated": "%TODAY%"
   },

@@ -40,9 +40,9 @@ func (b *bufferReader) Peek(n int) ([]byte, error) {
 		return b.r.Peek(n)
 	}
 	if len(b.buf) < n {
-		return nil, io.EOF
+		return b.buf, io.EOF
 	}
-	return b.buf, nil
+	return b.buf[:n], nil
 }
 
 func (b *bufferReader) Discard(n int) (discarded int, err error) {
@@ -52,7 +52,7 @@ func (b *bufferReader) Discard(n int) (discarded int, err error) {
 	if n == 0 {
 		return
 	}
-	b.buf = b.buf[:n]
+	b.buf = b.buf[n:]
 	return n, nil
 }
 
@@ -75,6 +75,26 @@ func NewReader(r io.Reader, max int) *IonReader {
 func (r *IonReader) Next() bool {
 	if r.ctx.size != 0 {
 		r.ctx.src.Discard(r.ctx.size)
+	}
+
+	if r.inStruct() {
+		buf, err := r.ctx.src.Peek(8)
+		if len(buf) == 0 {
+			if err == nil {
+				err = io.ErrUnexpectedEOF
+			}
+			r.ctx.err = err
+			goto handleError
+		}
+
+		sym, rest, err := ion.ReadLabel(buf)
+		if err != nil {
+			r.ctx.err = err
+			goto handleError
+		}
+
+		r.ctx.label = &sym
+		r.ctx.src.Discard(len(buf) - len(rest))
 	}
 
 	r.ctx.annotations = nil
@@ -114,28 +134,6 @@ func (r *IonReader) Next() bool {
 		r.ctx.src.Discard(len(buf) - len(rest))
 	}
 
-	if r.inStruct() {
-		buf, err := r.ctx.src.Peek(r.ctx.size)
-		if err != nil {
-			r.ctx.err = err
-			goto handleError
-		}
-
-		sym, rest, err := ion.ReadLabel(buf)
-		if err != nil {
-			r.ctx.err = err
-			goto handleError
-		}
-
-		r.ctx.label = &sym
-		r.ctx.src.Discard(len(buf) - len(rest))
-
-		r.ctx.typ, r.ctx.size, r.ctx.err = ionPeek(r.ctx.src)
-		if r.ctx.err != nil {
-			goto handleError
-		}
-	}
-
 	return true
 
 handleError:
@@ -159,11 +157,12 @@ func (r *IonReader) Type() ion.Type {
 
 // StepIn steps into a struct or a list.
 func (r *IonReader) StepIn() error {
-	if r.ctx.typ != ion.StructType && r.ctx.typ != ion.ListType {
-		return fmt.Errorf("expected 'struct' type or 'list' type, got '%s'", r.ctx.typ)
+	err := r.checkTypes("struct/list", ion.StructType, ion.ListType)
+	if err != nil {
+		return err
 	}
 
-	err := r.peek()
+	err = r.peek()
 	if err != nil {
 		return err
 	}
@@ -290,7 +289,7 @@ func (r *IonReader) ReadNullableUint() (*uint64, error) {
 
 func (r *IonReader) ReadInt() (int64, error) {
 	var value int64
-	err := r.checkType(ion.IntType)
+	err := r.checkTypes("integer", ion.UintType, ion.IntType)
 	if err != nil {
 		return value, err
 	}
@@ -466,7 +465,7 @@ func (r *IonReader) ReadNumber() (float64, error) {
 		return r.ReadFloat()
 	}
 
-	return 0, fmt.Errorf("expected numeric type, got '%s'", r.ctx.typ)
+	return 0, r.checkTypes("numeric", ion.UintType, ion.IntType, ion.FloatType)
 }
 
 // ReadNullableNumber reads any numeric value and returns it as a *float64. Fails, if the current
@@ -501,7 +500,7 @@ func (r *IonReader) ReadText() (string, error) {
 		return r.ReadString()
 	}
 
-	return "", fmt.Errorf("expected text type, got '%s'", r.ctx.typ)
+	return "", r.checkTypes("text", ion.SymbolType, ion.StringType)
 }
 
 // ReadNullableText reads any text value and returns it as a string. Fails, if the current value
@@ -680,6 +679,16 @@ func (r *IonReader) checkType(typ ion.Type) error {
 		return fmt.Errorf("expected '%s' type, got '%s'", typ, r.ctx.typ)
 	}
 	return nil
+}
+
+func (r *IonReader) checkTypes(name string, types ...ion.Type) error {
+	for _, typ := range types {
+		if r.ctx.typ == typ {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("expected '%s' type, got '%s'", name, r.ctx.typ)
 }
 
 func (r *IonReader) inStruct() bool {
