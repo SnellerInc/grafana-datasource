@@ -157,11 +157,12 @@ func (r *IonReader) Type() ion.Type {
 
 // StepIn steps into a struct or a list.
 func (r *IonReader) StepIn() error {
-	if r.ctx.typ != ion.StructType && r.ctx.typ != ion.ListType {
-		return fmt.Errorf("expected 'struct' type or 'list' type, got '%s'", r.ctx.typ)
+	err := r.checkTypes("struct/list", ion.StructType, ion.ListType)
+	if err != nil {
+		return err
 	}
 
-	err := r.peek()
+	err = r.peek()
 	if err != nil {
 		return err
 	}
@@ -288,7 +289,7 @@ func (r *IonReader) ReadNullableUint() (*uint64, error) {
 
 func (r *IonReader) ReadInt() (int64, error) {
 	var value int64
-	err := r.checkType(ion.IntType)
+	err := r.checkTypes("integer", ion.UintType, ion.IntType)
 	if err != nil {
 		return value, err
 	}
@@ -464,7 +465,7 @@ func (r *IonReader) ReadNumber() (float64, error) {
 		return r.ReadFloat()
 	}
 
-	return 0, fmt.Errorf("expected numeric type, got '%s'", r.ctx.typ)
+	return 0, r.checkTypes("numeric", ion.UintType, ion.IntType, ion.FloatType)
 }
 
 // ReadNullableNumber reads any numeric value and returns it as a *float64. Fails, if the current
@@ -499,7 +500,7 @@ func (r *IonReader) ReadText() (string, error) {
 		return r.ReadString()
 	}
 
-	return "", fmt.Errorf("expected text type, got '%s'", r.ctx.typ)
+	return "", r.checkTypes("text", ion.SymbolType, ion.StringType)
 }
 
 // ReadNullableText reads any text value and returns it as a string. Fails, if the current value
@@ -678,6 +679,16 @@ func (r *IonReader) checkType(typ ion.Type) error {
 		return fmt.Errorf("expected '%s' type, got '%s'", typ, r.ctx.typ)
 	}
 	return nil
+}
+
+func (r *IonReader) checkTypes(name string, types ...ion.Type) error {
+	for _, typ := range types {
+		if r.ctx.typ == typ {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("expected '%s' type, got '%s'", name, r.ctx.typ)
 }
 
 func (r *IonReader) inStruct() bool {

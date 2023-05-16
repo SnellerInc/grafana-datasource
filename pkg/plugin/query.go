@@ -220,22 +220,10 @@ func readUint64Nullable(r *IonReader) (*uint64, error) {
 }
 
 func readInt64(r *IonReader) (int64, error) {
-	if r.Type() == ion.UintType {
-		v, err := r.ReadUint()
-		return int64(v), err
-	}
 	return r.ReadInt()
 }
 
 func readInt64Nullable(r *IonReader) (*int64, error) {
-	if r.Type() == ion.UintType {
-		v, err := r.ReadUint()
-		if err != nil {
-			return nil, err
-		}
-		iv := int64(v)
-		return &iv, err
-	}
 	return r.ReadNullableInt()
 }
 
@@ -275,7 +263,7 @@ func readTimeNullable(r *IonReader) (*time.Time, error) {
 }
 
 func readTimeFromInt64(r *IonReader) (time.Time, error) {
-	value, err := readInt64(r)
+	value, err := r.ReadInt()
 	if err != nil {
 		return time.Time{}, err
 	}
