@@ -104,7 +104,11 @@ func grafanaType(column *snellerColumn) data.FieldType {
 		if column.Floating {
 			result = data.FieldTypeFloat64
 		} else {
-			result = data.FieldTypeInt64
+			if column.Signed {
+				result = data.FieldTypeInt64
+			} else {
+				result = data.FieldTypeUint64
+			}
 		}
 	case snellerTypeTimestamp:
 		result = data.FieldTypeTime
@@ -130,6 +134,8 @@ func grafanaFieldValues(name string, rowCount int, column *snellerColumn, isTime
 
 	if isTimeField {
 		switch typ {
+		case data.FieldTypeUint64:
+			fallthrough
 		case data.FieldTypeInt64:
 			return newFieldValues[time.Time](name, rowCount, readTimeFromInt64), nil
 		case data.FieldTypeNullableInt64:
@@ -151,6 +157,10 @@ func grafanaFieldValues(name string, rowCount int, column *snellerColumn, isTime
 		return newFieldValues[bool](name, rowCount, readBool), nil
 	case data.FieldTypeNullableBool:
 		return newFieldValues[*bool](name, rowCount, readBoolNullable), nil
+	case data.FieldTypeUint64:
+		return newFieldValues[uint64](name, rowCount, readUint64), nil
+	case data.FieldTypeNullableUint64:
+		return newFieldValues[*uint64](name, rowCount, readUint64Nullable), nil
 	case data.FieldTypeInt64:
 		return newFieldValues[int64](name, rowCount, readInt64), nil
 	case data.FieldTypeNullableInt64:
@@ -201,11 +211,31 @@ func readBoolNullable(r *IonReader) (*bool, error) {
 	return r.ReadNullableBool()
 }
 
+func readUint64(r *IonReader) (uint64, error) {
+	return r.ReadUint()
+}
+
+func readUint64Nullable(r *IonReader) (*uint64, error) {
+	return r.ReadNullableUint()
+}
+
 func readInt64(r *IonReader) (int64, error) {
+	if r.Type() == ion.UintType {
+		v, err := r.ReadUint()
+		return int64(v), err
+	}
 	return r.ReadInt()
 }
 
 func readInt64Nullable(r *IonReader) (*int64, error) {
+	if r.Type() == ion.UintType {
+		v, err := r.ReadUint()
+		if err != nil {
+			return nil, err
+		}
+		iv := int64(v)
+		return &iv, err
+	}
 	return r.ReadNullableInt()
 }
 
@@ -245,7 +275,7 @@ func readTimeNullable(r *IonReader) (*time.Time, error) {
 }
 
 func readTimeFromInt64(r *IonReader) (time.Time, error) {
-	value, err := r.ReadInt()
+	value, err := readInt64(r)
 	if err != nil {
 		return time.Time{}, err
 	}
