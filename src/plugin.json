@@ -18,7 +18,16 @@
       "large": "img/logo.png"
     },
     "links": [],
-    "screenshots": [],
+    "screenshots": [
+      {
+        "name": "Config Editor",
+        "path": "img/screenshot_config.png"
+      },
+      {
+        "name": "Query Editor",
+        "path": "img/screenshot_query.png"
+      }
+    ],
     "version": "%VERSION%",
     "updated": "%TODAY%"
   },
