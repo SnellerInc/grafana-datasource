@@ -94,7 +94,8 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
                     onChange={onDatabaseChange}
                     value={ databaseRef ? { label: databaseRef.current!, value: databaseRef.current! } : undefined }
                     isClearable
-                    isSearchable={false}
+                    isSearchable={true}
+                    allowCustomValue={true}
                 />
             </InlineField>
             <SQLEditor
