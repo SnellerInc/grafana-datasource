@@ -75,7 +75,7 @@ The Sneller data source supports some useful macros and variables that can be us
 
 You can use the `$__interval_ms` variable as a parameter to group by time.
 
-Grafana automatically calculates an interval that can be used to group by time in queries. When there are more data points than can be shown on a graph, then queries can be made more efficient by grouping by a larger interval. It is more efficient to group by 1 day than by 10s when looking at 3 months of data and the graph will look the same and the query will be faster. The `$__interval` is calculated using the time range and the width of the graph (the number of pixels).
+Grafana automatically calculates an interval that can be used to group by time in queries. When there are more data points than can be shown on a graph, then queries can be made more efficient by grouping by a larger interval. It is more efficient to group by 1 day than by 10s when looking at 3 months of data and the graph will look the same and the query will be faster. The `$__interval_ms` is calculated using the time range and the width of the graph (the number of pixels).
 
 ### `$__max_data_points`
 
