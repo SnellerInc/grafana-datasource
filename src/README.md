@@ -37,7 +37,7 @@ For self-hosted Sneller instances, this value must be set to your endpoint URL.
 
 Please insert the Sneller access token that will be used to retrieve data. This can either be the token you received during the initial setup of the tenant or a custom PAT.
 
-You do not need to specify a token for the `playgroun` region.
+You do not need to specify a token for the `playground` region.
 
 ## Getting Started
 
