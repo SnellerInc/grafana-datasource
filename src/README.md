@@ -31,7 +31,7 @@ If you are not yet using Sneller for your production data, but would like to exp
 
 This value is automatically set for Sneller Cloud instances after you select your home region in the Sneller Region drop-down menu.
 
-For self-hosted Sneller instances, this value must be set to your endpoint URL.
+For self-hosted Sneller instances, this value must be set to your `snellerd` endpoint URL.
 
 ### Sneller Token
 
