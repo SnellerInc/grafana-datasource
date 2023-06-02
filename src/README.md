@@ -15,7 +15,7 @@ Search for "Sneller" to find the official Sneller data source.
 
 ## Configuration
 
-The Sneller data source provides only the most essential settings for quick and easy setup.
+The Sneller data source only requires a small handful of settings to get started.
 
 ![](./img/readme_config.png)
 
