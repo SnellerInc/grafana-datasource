@@ -21,7 +21,7 @@ The Sneller data source only requires a small handful of settings to get started
 
 ### Sneller Region
 
-If you are using Sneller Cloud, you can select your home region (e.g. `us-east-1`) from the drop-down menu to automatically configure the endpoint URL.
+If you are using Sneller Cloud, you can select your bucket region (e.g. `us-east-1`) from the drop-down menu to automatically configure the endpoint URL.
 
 If you are using a self-hosted Sneller instance, please select `custom` and make sure to enter your endpoint URL as well.
 
@@ -29,7 +29,7 @@ If you are not yet using Sneller for your production data, but would like to exp
 
 ### Sneller Endpoint
 
-This value is automatically set for Sneller Cloud instances after you select your home region in the Sneller Region drop-down menu.
+This value is automatically set for Sneller Cloud instances after you select your bucket region in the Sneller Region drop-down menu.
 
 For self-hosted Sneller instances, this value must be set to your `snellerd` endpoint URL.
 
