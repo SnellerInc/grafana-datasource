@@ -54,7 +54,7 @@ GROUP BY type
 ORDER BY type
 ```
 
-Voilla! After settings the date-range to something like `2021-01-30 22:00:00` to `2021-01-31 22:00:00` (just an example range for which the GitHub Archive 2021 contains records), we can see the following graph:
+Voila! After setting the date-range to something like `2021-01-30 22:00:00` to `2021-01-31 22:00:00` (just an example range for which the GitHub Archive 2021 contains records), we can see the following graph:
 
 ![](./img/readme_query.png)
 
