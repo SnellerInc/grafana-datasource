@@ -17,7 +17,7 @@ Search for "Sneller" to find the official Sneller data source.
 
 The Sneller data source only requires a small handful of settings to get started.
 
-![](./img/readme_config.png)
+![](https://raw.githubusercontent.com/SnellerInc/grafana-datasource/main/src/img/readme_config.png)
 
 ### Sneller Region
 
@@ -56,7 +56,7 @@ ORDER BY type
 
 Voila! After setting the date-range to something like `2021-01-30 22:00:00` to `2021-01-31 22:00:00` (just an example range for which the GitHub Archive 2021 contains records), we can see the following graph:
 
-![](./img/readme_query.png)
+![](https://raw.githubusercontent.com/SnellerInc/grafana-datasource/main/src/img/readme_query.png)
 
 ## Macros and Variables
 
