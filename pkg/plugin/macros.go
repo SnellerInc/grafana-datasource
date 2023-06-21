@@ -75,6 +75,8 @@ func (m *snellerMacroEngine) Interpolate(query backend.DataQuery, sql string) st
 		case "timeFilter":
 			// See https://grafana.com/docs/grafana/latest/dashboards/variables/add-template-variables/#timefilter-or-__timefilter
 			return fmt.Sprintf("%s BETWEEN `%s` AND `%s`", groups[2], query.TimeRange.From.Format(time.RFC3339), query.TimeRange.To.Format(time.RFC3339))
+		case "timeGroup":
+			return m.Interpolate(query, fmt.Sprintf("DATE_BIN('$__interval_ms milliseconds', %s, `${from:date:iso}`)", groups[2]))
 		}
 		return groups[0]
 	})
