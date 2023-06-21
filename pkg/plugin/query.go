@@ -405,6 +405,10 @@ func deriveSchema(buf []byte) (*snellerSchema, error) {
 		}
 	}
 
+	if status.ResultSet.IsEmpty() {
+		return &schema, nil
+	}
+
 	// Restore column order
 	index := 0
 	err = status.ResultSet.UnpackStruct(func(field ion.Field) error {
@@ -429,6 +433,7 @@ func deriveSchema(buf []byte) (*snellerSchema, error) {
 }
 
 func analyzeRow(reader *IonReader, schema *snellerSchema, lookup map[string]*snellerColumn) error {
+	index := 0
 	for reader.Next() {
 		name, err := reader.FieldName()
 		if err != nil {
@@ -441,6 +446,7 @@ func analyzeRow(reader *IonReader, schema *snellerSchema, lookup map[string]*sne
 		col, ok := lookup[name]
 		if !ok {
 			col = &snellerColumn{
+				Index:    index,
 				Name:     name,
 				Typ:      snellerType,
 				Nullable: snellerType == snellerTypeNull,
@@ -452,6 +458,9 @@ func analyzeRow(reader *IonReader, schema *snellerSchema, lookup map[string]*sne
 			schema.Columns = append(schema.Columns, col)
 		}
 
+		if index != col.Index {
+			col.Index = -1
+		}
 		col.Count++
 
 		// Adjust column type if required
@@ -480,6 +489,8 @@ func analyzeRow(reader *IonReader, schema *snellerSchema, lookup map[string]*sne
 			}
 			// TODO: Required bits
 		}
+
+		index++
 	}
 
 	return reader.Error()
