@@ -83,6 +83,10 @@ The maximum amount of data points that can be visualized by the graph. You can u
 
 This helper macro translates to `field BETWEEN $__from AND $__to` and can be used for convenient input range restriction.
 
+### `$__timeGroup(field)`
+
+This helper macro translates to ``DATE_BIN('$__interval_ms milliseconds', field, `${from:date:iso}`)`` and can be used for convenient time bucket grouping.
+
 ### `$__time(field)`
 
 A time field is required for time series charts. In some cases, these values are not stored as `timestamp` data or calculated on demand. Use this macro to mark a specific field as a "time" field. The data source will attempt to convert these values to `timestamp`s as needed. Currently numeric values in UNIX millisecond timestamp format and strings in RFC3339 format are supported.
