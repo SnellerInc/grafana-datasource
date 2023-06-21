@@ -85,7 +85,7 @@ This helper macro translates to `field BETWEEN $__from AND $__to` and can be use
 
 ### `$__timeGroup(field)`
 
-This helper macro translates to ``DATE_BIN('$__interval_ms milliseconds', field, `${from:date:iso}`)`` and can be used for convenient time bucket grouping.
+This helper macro translates to ``DATE_BIN('$__interval_ms milliseconds', field, `${__from:date:iso}`)`` and can be used for convenient time bucket grouping.
 
 ### `$__time(field)`
 
