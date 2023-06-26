@@ -524,14 +524,14 @@ func iterateRows(buf []byte, readRowFn func(reader *IonReader, index int) error)
 			case "final_status":
 				err = reader.Unmarshal(&finalStatus)
 				if err != nil {
-					break
+					return nil, err
 				}
 				status = &finalStatus
 				continue
 			case "query_error":
 				err = reader.Unmarshal(&queryError)
 				if err != nil {
-					break
+					return nil, err
 				}
 				continue
 			default:
@@ -541,22 +541,23 @@ func iterateRows(buf []byte, readRowFn func(reader *IonReader, index int) error)
 
 		err = reader.StepIn()
 		if err != nil {
-			break
+			return nil, err
 		}
 
 		err = readRowFn(reader, index)
 		if err != nil {
-			break
+			return nil, err
 		}
 
 		err = reader.StepOut()
 		if err != nil {
-			break
+			return nil, err
 		}
-
 		index++
 	}
-
+	if status == nil {
+		return nil, fmt.Errorf("missing final_status annotation (upstream query error)")
+	}
 	return status, reader.Error()
 }
 
