@@ -47,10 +47,10 @@ export function ConfigEditor(props: Props) {
         endpoint = ''
         break
       case 'play':
-        endpoint = `https://play.sneller.io`
+        endpoint = `https://play.sneller.ai`
         break
       default:
-        endpoint = `https://snellerd-production.${value.value}.sneller.io`
+        endpoint = `https://snellerd-production.${value.value}.sneller.ai`
         break
     }
 
